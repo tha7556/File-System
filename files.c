@@ -63,7 +63,15 @@ void openf(char *filename, OFILE *file)
 
 EXIT_CODE closef(OFILE *file)
 {
+    if(file->iorb_count > 0){
+        return fail; //pending I/O requests remaining, cannot be closed
+    }
+    file->inode->count = file->inode->count -1;
+    if (file->inode->count == 0){
+        delete_file(file->ofile_id);
+    }
 }
+
 
 
 
