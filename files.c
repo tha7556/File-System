@@ -82,12 +82,45 @@ EXIT_CODE allocate_blocks(INODE *inode, int numBlocksNeeded)
 
 int search_file(char *filename)
 {
+    int i;
+    for(i = 0; i < MAX_OPENFILE; i++) {
+        if(strcmp(filename,theDirectory[i].filename) == 0) { //they match
+            return i;
+        }
+    }
+    return -1;
 }
 
 
 
 int new_file(char *filename)
 {
+   int i;
+   for(i = 0; i < MAX_OPENFILE; i++) {
+        if(theDirectory[i].free == true) {
+            theDirectory[i].filename = filename;
+            theDirectory[i].free = false;
+            theDirectory[i].inode->filesize = 0;
+            theDirectory[i].inode->count = 0;
+
+            int max = -1;
+            int maxIndex = -1;
+            int j;
+            for(j = 0; j < MAX_DEV; j++) {
+                if(Dev_Tbl[i].num_of_free_blocks > max) {
+                    max = Dev_Tbl[i].num_of_free_blocks;
+                    maxIndex = i;
+                }
+            }
+            theDirectory[i].inode->dev_id = maxIndex;
+            for(j = 0; j < MAX_BLOCK; j++) {
+                theDirectory[i].inode->allocated_blocks[j] = -1;
+            }
+            return i;
+        }
+   }
+   if (______trace_switch) printf("Error, no free entries");
+   return -1;
 }
 
 
