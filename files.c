@@ -77,6 +77,10 @@ EXIT_CODE closef(OFILE *file)
 
 EXIT_CODE readf(OFILE *file, int position, int page_id, IORB  *iorb)
 {
+    PCB *pcb = PTBR->pcb;
+    if(0 <= position && position < file->inode->filesize) {
+
+    }
 }
 
 
