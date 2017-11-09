@@ -76,6 +76,30 @@ void notify_files(IORB *iorb)
 
 EXIT_CODE allocate_blocks(INODE *inode, int numBlocksNeeded)
 {
+    if(Dev_Tbl[inode->dev_id].num_of_free_blocks < numBlocksNeeded) {
+        return fail;
+    }
+    int blockNum;
+    if(inode->filesize > 0)
+        blockNum = inode->filesize -1 / (PAGE_SIZE + 1);
+    else
+        blockNum = 0;
+
+    int i;
+    for(i = 0; i < MAX_BLOCK; i++) {
+        if(Dev_Tbl[inode->dev_id].free_blocks[i] == true) {
+            Dev_Tbl[inode->dev_id].free_blocks[i] = false;
+            Dev_Tbl[inode->dev_id].num_of_free_blocks--;
+            int j;
+            for(j = 0; j < MAX_BLOCK; j++) {
+                if(inode->allocated_blocks[j] != -1) {
+                    inode->allocated_blocks[j] = i;
+                    break;
+                }
+            }
+        }
+    }
+    return ok;
 }
 
 
