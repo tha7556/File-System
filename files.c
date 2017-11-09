@@ -43,9 +43,20 @@ void files_init()
 }
 
 
-//good luck
+
 void openf(char *filename, OFILE *file)
 {
+    INODE *node;
+    if(search_file(filename) != -1) {
+        node = theDirectory[search_file(filename)].inode;
+    }
+    else {
+        node = theDirectory[new_file(filename)].inode;
+    }
+    file->inode = node;
+    file->dev_id = file->inode->dev_id;
+    file->iorb_count = 0;
+    file->inode->count++;
 }
 
 
