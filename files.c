@@ -231,6 +231,15 @@ int new_file(char *filename)
 
 void delete_file(int dirNum)
 {
+    int i;
+    for(i = 0; i < MAX_BLOCK; i++) {
+        int b = theDirectory[dirNum].inode->allocated_blocks[i];
+        Dev_Tbl[i].free_blocks[b] = true;
+        Dev_Tbl[i].num_of_free_blocks++;
+        theDirectory[dirNum].inode->allocated_blocks[i] = -1;
+    }
+    theDirectory[dirNum].free = true;
+    theDirectory[dirNum].filename = NULL;
 }
 
 
