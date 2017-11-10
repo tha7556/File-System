@@ -79,20 +79,77 @@ EXIT_CODE readf(OFILE *file, int position, int page_id, IORB  *iorb)
 {
     PCB *pcb = PTBR->pcb;
     if(0 <= position && position < file->inode->filesize) {
+       int num = position / PAGE_SIZE;
+       file->iorb_count++;
 
+       iorb->dev_id = file->inode->dev_id;
+       iorb->block_id = file->inode->allocated_blocks[num];
+       iorb->action = read;
+       iorb->page_id = page_id;
+       iorb->pcb = pcb;
+       iorb->file = file;
+
+       iorb->event->happened = false;
+       Int_Vector.event = iorb->event;
+       Int_Vector.iorb = iorb;
+       Int_Vector.cause = iosvc;
+       gen_int_handler();
+
+       return ok;
     }
+    else
+        return fail;
 }
 
 
 
 EXIT_CODE writef(OFILE *file, int position, int page_id, IORB *iorb)
 {
+    PCB *pcb = PTBR->pcb;
+    if(0 <= position && position < file->inode->filesize) {
+       int num = position / PAGE_SIZE; //3
+       int lastBlock;
+       if(file->inode->filesize != 0) //potential error
+        lastBlock = (file->inode->filesize - 1)/PAGE_SIZE;
+       else
+        lastBlock = -1;
+        if(file->inode->allocated_blocks[num] > file->inode->allocated_blocks[lastBlock]) {
+            if(allocate_blocks(file->inode,file->inode->filesize) == -1) {
+                iorb->dev_id = -1;
+                return fail;
+            }
+        }
+        if(file->inode->filesize <= num) {
+            file->inode->filesize = num+1;
+        }
+        file->iorb_count++;
+
+       iorb->dev_id = file->inode->dev_id;
+       iorb->block_id = file->inode->allocated_blocks[num];
+       iorb->action = write;
+       iorb->page_id = page_id;
+       iorb->pcb = pcb;
+       iorb->file = file;
+
+       iorb->event->happened = false;
+       Int_Vector.event = iorb->event;
+       Int_Vector.iorb = iorb;
+       Int_Vector.cause = iosvc;
+       gen_int_handler();
+
+
+
+       return ok;
+    }
+    else
+        return fail;
 }
 
 
 
 void notify_files(IORB *iorb)
 {
+    iorb->file->iorb_count--;
 }
 
 
