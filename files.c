@@ -124,9 +124,9 @@ EXIT_CODE writef(OFILE *file, int position, int page_id, IORB *iorb)
             if (______trace_switch) printf("lastBlock: %d\n",lastBlock);
         }
         if (______trace_switch) printf("logical: %d vs last: %d\n",logicalBlock,lastBlock);
-
+        if (______trace_switch) printf("filesize: %d\n",file->inode->filesize);
         if(logicalBlock > lastBlock) { //5
-            if(allocate_blocks(file->inode,logicalBlock) == fail) { //5
+            if(allocate_blocks(file->inode,file->inode->filesize) == fail) { //5
                 iorb->dev_id = -1; //5
                 if (______trace_switch) printf("RETURNING FAIL, not enough blocks!!\n");
                 return fail; //5
@@ -171,6 +171,8 @@ void notify_files(IORB *iorb)
 EXIT_CODE allocate_blocks(INODE *inode, int numBlocksNeeded)
 {
     if (______trace_switch) printf("allocate_blocks() for: %d blocks\n",numBlocksNeeded);
+    print_dir();
+    print_disk_map();
     if(Dev_Tbl[inode->dev_id].num_of_free_blocks < numBlocksNeeded) {
             if (______trace_switch) printf("leaving allocate fail\n");
         return fail;
@@ -183,7 +185,9 @@ EXIT_CODE allocate_blocks(INODE *inode, int numBlocksNeeded)
 
     int i;
     int remaining = numBlocksNeeded;
-    for(i = 0; i < MAX_BLOCK; i++) {
+    if(remaining == 0)
+        remaining = 1;
+    for(i = 0; i < MAX_BLOCK && remaining > 0; i++) {
         if(Dev_Tbl[inode->dev_id].free_blocks[i] == true) {
             Dev_Tbl[inode->dev_id].free_blocks[i] = false;
             Dev_Tbl[inode->dev_id].num_of_free_blocks--;
@@ -193,6 +197,8 @@ EXIT_CODE allocate_blocks(INODE *inode, int numBlocksNeeded)
         }
     }
     if (______trace_switch) printf("leaving allocate ok\n");
+    print_dir();
+    print_disk_map();
     return ok;
 }
 
@@ -217,31 +223,30 @@ int new_file(char *filename)
    if (______trace_switch) printf("new_file()\n");
    int i;
    for(i = 0; i < MAX_OPENFILE; i++) {
-        if(theDirectory[i].free == true) {
-            theDirectory[i].filename = filename;
-            theDirectory[i].free = false;
-            theDirectory[i].inode->filesize = 0;
-            theDirectory[i].inode->count = 0;
+        if(theDirectory[i].free == true)
+        break;
+   }
+   if(theDirectory[i].free != true) {
+    if (______trace_switch) printf("Error, no free entries");
+    return -1;
+   }
+   theDirectory[i].filename = filename;
+   theDirectory[i].free = false;
+   theDirectory[i].inode->filesize = 0;
+   theDirectory[i].inode->count = 0;
 
-            int max = -1;
-            int maxIndex = -1;
-            int j;
-            for(j = 0; j < MAX_DEV; j++) {
-                if(Dev_Tbl[j].num_of_free_blocks > max) {
-                    max = Dev_Tbl[j].num_of_free_blocks;
-                    maxIndex = j;
-                }
-            }
-            theDirectory[i].inode->dev_id = maxIndex;
-            for(j = 0; j < MAX_BLOCK; j++) {
-                theDirectory[i].inode->allocated_blocks[j] = -1;
-            }
-            if (______trace_switch) printf("device: %d\n",i);
-            return i;
+   int j, max = -1, maxIndex;
+   for(j = 0; j < MAX_DEV; j++) {
+        if(Dev_Tbl[j].num_of_free_blocks > max) {
+            max = Dev_Tbl[j].num_of_free_blocks;
+            maxIndex = j;
         }
    }
-   if (______trace_switch) printf("Error, no free entries");
-   return -1;
+   theDirectory[i].inode->dev_id = maxIndex;
+   for(j = 0; j < MAX_BLOCK; j++) {
+    theDirectory[i].inode->allocated_blocks[j] = -1;
+   }
+   return i;
 }
 
 
@@ -249,6 +254,8 @@ int new_file(char *filename)
 void delete_file(int dirNum)
 {
     if (______trace_switch) printf("delete_file()\n");
+    print_dir();
+    print_disk_map();
     int i;
     for(i = 0; i < MAX_BLOCK; i++) {
         int b = theDirectory[dirNum].inode->allocated_blocks[i];
@@ -258,6 +265,10 @@ void delete_file(int dirNum)
     }
     theDirectory[dirNum].free = true;
     theDirectory[dirNum].filename = NULL;
+    if (______trace_switch) printf("Done deleting");
+    print_dir();
+    print_disk_map();
+
 }
 
 
