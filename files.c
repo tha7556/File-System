@@ -117,6 +117,7 @@ EXIT_CODE writef(OFILE *file, int position, int page_id, IORB *iorb)
     PCB *pcb = PTBR->pcb; //1
     if(0 <= position) {//2
         int logicalBlock = position / PAGE_SIZE; //3
+        file->inode->dev_id = file->dev_id;
         int lastBlock = -1;
         if (______trace_switch) printf("numFree: %d/%d\n",Dev_Tbl[file->dev_id].num_of_free_blocks,MAX_BLOCK);
         if(file->inode->filesize != 0) {
@@ -157,6 +158,7 @@ EXIT_CODE writef(OFILE *file, int position, int page_id, IORB *iorb)
     }
     else { //2
         if (______trace_switch) printf("RETURNING FAIL, position < 0!!\n");
+        iorb->dev_id = -1;
         return fail;
     }
 }
@@ -176,6 +178,7 @@ EXIT_CODE allocate_blocks(INODE *inode, int numBlocksNeeded)
     if (______trace_switch) printf("allocate_blocks() for: %d blocks\n",numBlocksNeeded);
     print_dir();
     print_disk_map();
+    if (______trace_switch) printf("Need: %d and have: %d\n",numBlocksNeeded,Dev_Tbl[inode->dev_id].num_of_free_blocks);
     if(Dev_Tbl[inode->dev_id].num_of_free_blocks < numBlocksNeeded) {
             if (______trace_switch) printf("leaving allocate fail\nNeed: %d and have: %d\n",numBlocksNeeded,Dev_Tbl[inode->dev_id].num_of_free_blocks);
         return fail;
@@ -188,7 +191,7 @@ EXIT_CODE allocate_blocks(INODE *inode, int numBlocksNeeded)
     if (______trace_switch) printf("Logical Block: %d\n",blockNum);
     int i;
     int remaining = numBlocksNeeded;
-    for(i = 0; i < MAX_BLOCK && remaining > -1; i++) {
+    for(i = 0; i < MAX_BLOCK && remaining > 0; i++) {
         if(Dev_Tbl[inode->dev_id].free_blocks[i] == true) {
             Dev_Tbl[inode->dev_id].free_blocks[i] = false;
             Dev_Tbl[inode->dev_id].num_of_free_blocks--;
@@ -264,7 +267,7 @@ void delete_file(int dirNum)
         if(b != -1 && b != 0) {
             Dev_Tbl[theDirectory[dirNum].inode->dev_id].free_blocks[b] = true;
             Dev_Tbl[theDirectory[dirNum].inode->dev_id].num_of_free_blocks++;
-            theDirectory[dirNum].inode->allocated_blocks[i] = -2;
+            theDirectory[dirNum].inode->allocated_blocks[i] = -1;
         }
     }
     theDirectory[dirNum].free = true;
