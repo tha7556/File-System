@@ -47,7 +47,7 @@ void files_init()
 
 void openf(char *filename, OFILE *file)
 {
-    if (______trace_switch) printf("openf()\n");
+    if (______trace_switch) printf("openf(%s)\n",filename);
     INODE *node;
     if(search_file(filename) != -1) {
         node = theDirectory[search_file(filename)].inode;
@@ -65,7 +65,7 @@ void openf(char *filename, OFILE *file)
 
 EXIT_CODE closef(OFILE *file)
 {
-    if (______trace_switch) printf("closef()\n");
+    if (______trace_switch) printf("closef(%d)\n",file->ofile_id);
     if(file->iorb_count > 0){
         return fail; //pending I/O requests remaining, cannot be closed
     }
@@ -81,7 +81,7 @@ EXIT_CODE closef(OFILE *file)
 
 EXIT_CODE readf(OFILE *file, int position, int page_id, IORB  *iorb)
 {
-    if (______trace_switch) printf("readf()\n");
+    if (______trace_switch) printf("readf(%d)\n",file->inode);
     PCB *pcb = PTBR->pcb;
     if(0 <= position && position < file->inode->filesize) {
        int num = position / PAGE_SIZE;
@@ -112,21 +112,21 @@ EXIT_CODE writef(OFILE *file, int position, int page_id, IORB *iorb)
 {
     print_dir();
     print_disk_map();
-    if (______trace_switch) printf("writef(file, position: %d, page_id: %d)\n",position,page_id);
+    if (______trace_switch) printf("writef(file: %d, position: %d, page_id: %d)\n",file->ofile_id,position,page_id);
 
     PCB *pcb = PTBR->pcb; //1
     if(0 <= position) {//2
         int logicalBlock = position / PAGE_SIZE; //3
         int lastBlock = -1;
         if (______trace_switch) printf("numFree: %d/%d\n",Dev_Tbl[file->dev_id].num_of_free_blocks,MAX_BLOCK);
-        if(Dev_Tbl[file->dev_id].num_of_free_blocks != MAX_BLOCK) { //4 PROBLEM
+        if(file->inode->filesize != 0) { //4 PROBLEM?
             lastBlock = (file->inode->filesize - 1) / PAGE_SIZE; //4
             if (______trace_switch) printf("lastBlock: %d\n",lastBlock);
         }
         if (______trace_switch) printf("logical: %d vs last: %d\n",logicalBlock,lastBlock);
         if (______trace_switch) printf("filesize: %d\n",file->inode->filesize);
         if(logicalBlock > lastBlock) { //5
-            if(allocate_blocks(file->inode,file->inode->filesize) == fail) { //5
+            if(allocate_blocks(file->inode,file->inode->filesize) == fail) { //5 PROBLEM?
                 iorb->dev_id = -1; //5
                 if (______trace_switch) printf("RETURNING FAIL, not enough blocks!!\n");
                 return fail; //5
@@ -185,8 +185,6 @@ EXIT_CODE allocate_blocks(INODE *inode, int numBlocksNeeded)
 
     int i;
     int remaining = numBlocksNeeded;
-    if(remaining == 0)
-        remaining = 1;
     for(i = 0; i < MAX_BLOCK && remaining > 0; i++) {
         if(Dev_Tbl[inode->dev_id].free_blocks[i] == true) {
             Dev_Tbl[inode->dev_id].free_blocks[i] = false;
@@ -206,7 +204,7 @@ EXIT_CODE allocate_blocks(INODE *inode, int numBlocksNeeded)
 
 int search_file(char *filename)
 {
-    if (______trace_switch) printf("search_file()\n");
+    if (______trace_switch) printf("search_file(%s)\n",filename);
     int i;
     for(i = 0; i < MAX_OPENFILE; i++) {
         if(theDirectory[i].filename != NULL && strcmp(filename,theDirectory[i].filename) == 0) { //they match
@@ -220,7 +218,7 @@ int search_file(char *filename)
 
 int new_file(char *filename)
 {
-   if (______trace_switch) printf("new_file()\n");
+   if (______trace_switch) printf("new_file(%s)\n",filename);
    int i;
    for(i = 0; i < MAX_OPENFILE; i++) {
         if(theDirectory[i].free == true)
@@ -234,7 +232,7 @@ int new_file(char *filename)
    theDirectory[i].free = false;
    theDirectory[i].inode->filesize = 0;
    theDirectory[i].inode->count = 0;
-
+   if (______trace_switch) printf("file: %s put at theDirectory[%d]\n",filename,i);
    int j, max = -1, maxIndex;
    for(j = 0; j < MAX_DEV; j++) {
         if(Dev_Tbl[j].num_of_free_blocks > max) {
@@ -253,15 +251,17 @@ int new_file(char *filename)
 
 void delete_file(int dirNum)
 {
-    if (______trace_switch) printf("delete_file()\n");
+    if (______trace_switch) printf("delete_file(%d)\n",dirNum);
     print_dir();
     print_disk_map();
     int i;
     for(i = 0; i < MAX_BLOCK; i++) {
         int b = theDirectory[dirNum].inode->allocated_blocks[i];
-        Dev_Tbl[theDirectory[dirNum].inode->dev_id].free_blocks[b] = true;
-        Dev_Tbl[theDirectory[dirNum].inode->dev_id].num_of_free_blocks++;
-        theDirectory[dirNum].inode->allocated_blocks[i] = -1;
+        if(b != -1 && b != 0) {
+            Dev_Tbl[theDirectory[dirNum].inode->dev_id].free_blocks[b] = true;
+            Dev_Tbl[theDirectory[dirNum].inode->dev_id].num_of_free_blocks++;
+            theDirectory[dirNum].inode->allocated_blocks[i] = -2;
+        }
     }
     theDirectory[dirNum].free = true;
     theDirectory[dirNum].filename = NULL;
