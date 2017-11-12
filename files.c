@@ -119,14 +119,14 @@ EXIT_CODE writef(OFILE *file, int position, int page_id, IORB *iorb)
         int logicalBlock = position / PAGE_SIZE; //3
         int lastBlock = -1;
         if (______trace_switch) printf("numFree: %d/%d\n",Dev_Tbl[file->dev_id].num_of_free_blocks,MAX_BLOCK);
-        if(file->inode->filesize != 0) { //4 PROBLEM?
+        if(file->inode->filesize != 0) {
             lastBlock = (file->inode->filesize - 1) / PAGE_SIZE; //4
             if (______trace_switch) printf("lastBlock: %d\n",lastBlock);
         }
         if (______trace_switch) printf("logical: %d vs last: %d\n",logicalBlock,lastBlock);
         if (______trace_switch) printf("filesize: %d\n",file->inode->filesize);
         if(logicalBlock > lastBlock) { //5
-            if(allocate_blocks(file->inode,file->inode->filesize) == fail) { //5 PROBLEM?
+            if(allocate_blocks(file->inode,logicalBlock-lastBlock) == fail) { //5 PROBLEM!
                 iorb->dev_id = -1; //5
                 if (______trace_switch) printf("RETURNING FAIL, not enough blocks!!\n");
                 return fail; //5
@@ -138,6 +138,8 @@ EXIT_CODE writef(OFILE *file, int position, int page_id, IORB *iorb)
         file->iorb_count++; //8
         iorb->dev_id = file->inode->dev_id; //9a
         iorb->block_id = file->inode->allocated_blocks[logicalBlock]; //9b
+        if (______trace_switch) printf("block id: %d at index: %d\n",iorb->block_id,logicalBlock);
+
         iorb->action = write; // 9c
         iorb->page_id = page_id; //9d
         iorb->pcb = pcb; //9e
@@ -148,8 +150,9 @@ EXIT_CODE writef(OFILE *file, int position, int page_id, IORB *iorb)
         Int_Vector.event = iorb->event;
         Int_Vector.iorb = iorb;
         Int_Vector.cause = iosvc;
+        if (______trace_switch) printf("Handle it!\n");
         gen_int_handler();
-
+        if (______trace_switch) printf("Done Writing\n");
         return ok; //11
     }
     else { //2
@@ -174,22 +177,23 @@ EXIT_CODE allocate_blocks(INODE *inode, int numBlocksNeeded)
     print_dir();
     print_disk_map();
     if(Dev_Tbl[inode->dev_id].num_of_free_blocks < numBlocksNeeded) {
-            if (______trace_switch) printf("leaving allocate fail\n");
+            if (______trace_switch) printf("leaving allocate fail\nNeed: %d and have: %d\n",numBlocksNeeded,Dev_Tbl[inode->dev_id].num_of_free_blocks);
         return fail;
     }
     int blockNum;
     if(inode->filesize > 0)
-        blockNum = (inode->filesize -1) / (PAGE_SIZE + 1);
+        blockNum = ((inode->filesize - 1) / PAGE_SIZE) + 1;
     else
         blockNum = 0;
-
+    if (______trace_switch) printf("Logical Block: %d\n",blockNum);
     int i;
     int remaining = numBlocksNeeded;
-    for(i = 0; i < MAX_BLOCK && remaining > 0; i++) {
+    for(i = 0; i < MAX_BLOCK && remaining > -1; i++) {
         if(Dev_Tbl[inode->dev_id].free_blocks[i] == true) {
             Dev_Tbl[inode->dev_id].free_blocks[i] = false;
             Dev_Tbl[inode->dev_id].num_of_free_blocks--;
-            inode->allocated_blocks[i] = blockNum;
+            inode->allocated_blocks[blockNum] = i;
+            if (______trace_switch) printf("Physical Block: %d at index: %d\n",inode->allocated_blocks[blockNum],blockNum);
             blockNum++;
             remaining--;
         }
