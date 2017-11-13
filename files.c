@@ -56,7 +56,7 @@ void openf(char *filename, OFILE *file)
         node = theDirectory[new_file(filename)].inode;
     }
     file->inode = node;
-    file->dev_id = file->inode->dev_id;
+    file->dev_id = node->dev_id;
     file->iorb_count = 0;
     file->inode->count++;
 }
@@ -65,15 +65,15 @@ void openf(char *filename, OFILE *file)
 
 EXIT_CODE closef(OFILE *file)
 {
-    if (______trace_switch) printf("closef(%d)\n",file->ofile_id);
+    if (______trace_switch) printf("closef(%d)\n",file->inode->inode_id);
     if(file->iorb_count > 0){
         return fail; //pending I/O requests remaining, cannot be closed
     }
-    file->inode->count = file->inode->count -1;
+    file->inode->count--;
     if (file->inode->count == 0){
-        delete_file(file->ofile_id);
-        return ok;
+        delete_file(file->inode->inode_id);
     }
+    return ok; //?
 }
 
 
@@ -84,11 +84,11 @@ EXIT_CODE readf(OFILE *file, int position, int page_id, IORB  *iorb)
     if (______trace_switch) printf("readf(%d)\n",file->inode);
     PCB *pcb = PTBR->pcb;
     if(0 <= position && position < file->inode->filesize) {
-       int num = position / PAGE_SIZE;
+       int logicalBlock = position / PAGE_SIZE;
        file->iorb_count++;
 
        iorb->dev_id = file->inode->dev_id;
-       iorb->block_id = file->inode->allocated_blocks[num];
+       iorb->block_id = file->inode->allocated_blocks[logicalBlock];
        iorb->action = read;
        iorb->page_id = page_id;
        iorb->pcb = pcb;
@@ -102,8 +102,10 @@ EXIT_CODE readf(OFILE *file, int position, int page_id, IORB  *iorb)
 
        return ok;
     }
-    else
+    else {
+        iorb->dev_id = -1;
         return fail;
+    }
 }
 
 
@@ -214,7 +216,7 @@ int search_file(char *filename)
     if (______trace_switch) printf("search_file(%s)\n",filename);
     int i;
     for(i = 0; i < MAX_OPENFILE; i++) {
-        if(theDirectory[i].filename != NULL && strcmp(filename,theDirectory[i].filename) == 0) { //they match
+        if(theDirectory[i].free != true && strcmp(filename,theDirectory[i].filename) == 0) { //they match
             return i;
         }
     }
@@ -263,9 +265,9 @@ void delete_file(int dirNum)
     print_disk_map();
     int i;
     for(i = 0; i < MAX_BLOCK; i++) {
-        int b = theDirectory[dirNum].inode->allocated_blocks[i];
-        if(b != -1 && b != 0) {
-            Dev_Tbl[theDirectory[dirNum].inode->dev_id].free_blocks[b] = true;
+        int physicalBlock = theDirectory[dirNum].inode->allocated_blocks[i];
+        if(physicalBlock != -1 && physicalBlock != 0) {
+            Dev_Tbl[theDirectory[dirNum].inode->dev_id].free_blocks[physicalBlock] = true;
             Dev_Tbl[theDirectory[dirNum].inode->dev_id].num_of_free_blocks++;
             theDirectory[dirNum].inode->allocated_blocks[i] = -1;
         }
