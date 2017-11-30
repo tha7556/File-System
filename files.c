@@ -42,8 +42,9 @@ void files_init() {
 
 void openf(char *filename, OFILE *file) {
     INODE *node;
-    if(search_file(filename) != -1) {
-        node = theDirectory[search_file(filename)].inode;
+    int fileIndex = search_file(filename);
+    if(fileIndex != -1) {
+        node = theDirectory[fileIndex].inode;
     }
     else {
         node = theDirectory[new_file(filename)].inode;
@@ -103,7 +104,6 @@ EXIT_CODE writef(OFILE *file, int position, int page_id, IORB *iorb) {
     PCB *pcb = PTBR->pcb;
     if(0 <= position) {
         int logicalBlock = position / PAGE_SIZE;
-        file->inode->dev_id = file->dev_id;
         int lastBlock = -1;
         if(file->inode->filesize != 0) {
             lastBlock = (file->inode->filesize - 1) / PAGE_SIZE;
@@ -118,6 +118,7 @@ EXIT_CODE writef(OFILE *file, int position, int page_id, IORB *iorb) {
             file->inode->filesize = position + 1;
         }
         file->iorb_count++;
+        file->inode->dev_id = file->dev_id;
         iorb->dev_id = file->inode->dev_id;
         iorb->block_id = file->inode->allocated_blocks[logicalBlock];
 
@@ -190,8 +191,10 @@ int new_file(char *filename) {
         if(theDirectory[i].free == true)
         break;
    }
-   if(theDirectory[i].free != true) {
-    return -1;
+   if(theDirectory[i].free != true) { //He made a comment about what happens if this is true, but the instructions just say to print an error and return -1
+		if (______trace_switch)
+			printf("ERROR, no free entries");
+		return -1;
    }
    theDirectory[i].filename = filename;
    theDirectory[i].free = false;
@@ -217,7 +220,7 @@ void delete_file(int dirNum) {
     int i;
     for(i = 0; i < MAX_BLOCK; i++) {
         int physicalBlock = theDirectory[dirNum].inode->allocated_blocks[i];
-        if(physicalBlock != -1 && physicalBlock != 0) {
+        if(physicalBlock != -1) {
             Dev_Tbl[theDirectory[dirNum].inode->dev_id].free_blocks[physicalBlock] = true;
             Dev_Tbl[theDirectory[dirNum].inode->dev_id].num_of_free_blocks++;
             theDirectory[dirNum].inode->allocated_blocks[i] = -1;
